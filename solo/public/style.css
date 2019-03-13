@@ -102,6 +102,7 @@ body {
   border: 5px solid #553c2b;
   border-radius: 5px;
   text-align: center;
+  display: none;
 }
 .short-url {
   color: white;

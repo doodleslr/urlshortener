@@ -12,19 +12,24 @@ app.use(express.static('public'));
 app.use(bodyParser.urlencoded({extended: false}));
 app.use(bodyParser.json());
 
-
-
 app.get('/', (req, res)=>{
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+let db;
+let collection;
 MongoClient.connect(databaseURL, {useNewUrlParser: true}, (err, database) => {
     if(err){
         throw err;
     }
-    app.locals.db = database.db('urlshortener');
+    
+    app.listen(4100);
+
+    db = database.db('urlshortener');
+    collection = db.collection('urlshortener');
+
     if(!database){
-        console.log('Database is not connected');
+        res.end('Database is not connected');
     }
 });
 
@@ -39,32 +44,41 @@ app.post('/short', (req, res) => {
         if(err) {
             return res.status(404).send({error: 'URL does not exist'});
         }
-        let dbApp = req.app.locals;//stuck here because it's being a cunt and .open isn't a function which is utter fucken bullshit
-        dbApp.open(( db, url) => {
-            var collection = db.collection('shortenedURLs');
-            return collection.update(
-                { original_url: url },
-                {   
+
+        collection.findOneAndUpdate(
+            { original_url: vanillaURL.href },
+                { 
                     $setOnInsert: {
-                        original_url: url,
-                        shortId: nanoid(7),
+                        original_url: vanillaURL.href,
+                        shortID: nanoid(7),
                     },
                 },
-                { 
-                    upsert: true, 
+                {
+                    upsert: true,
                     returnOriginal: false,
-                },
-            );
-        })
+                }
+        )
         .then(result => {
             const doc = result.value;
             res.json({
                 original_url: doc.original_url,
-                shortId: doc.shortId,
+                shortID: doc.shortID,
             });
         })
         .catch(console.error);
     });
 });
 
-app.listen(4100);
+app.get('/:shortID', (req, res) => {
+    const queryShortID = req.params.shortID;
+    collection.findOne(
+        { shortID: queryShortID }
+    )
+    .then(idResult => {
+        if(idResult === null) {
+            return res.send('Sorry we could not find that link');
+        }
+        res.redirect(idResult.original_url);
+    })
+    .catch(console.error);
+});
